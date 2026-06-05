@@ -1,6 +1,8 @@
 
 locals {
   nfs_version = var.nfs_version != "" ? var.nfs_version : (contains(["ZONAL", "REGIONAL", "ENTERPRISE"], var.tier) ? "4.1" : "3")
+
+  deletion_protection = !coalesce(var.allow_deletion, false)
 }
 
 resource "google_filestore_instance" "persistent-volumes" {
@@ -9,8 +11,9 @@ resource "google_filestore_instance" "persistent-volumes" {
   protocol = format("NFS_V%s", replace(local.nfs_version, ".", "_"))
   location = var.location
 
-  deletion_protection_enabled = !(coalesce(var.allow_deletion, false))
-  deletion_protection_reason  = "If this gets removed, the orchestrator will throw tons of errors"
+  deletion_protection_enabled = local.deletion_protection
+  # GCP rejects a reason when protection is disabled, so only set it when enabled.
+  deletion_protection_reason = local.deletion_protection ? "If this gets removed, the orchestrator will throw tons of errors" : null
 
   file_shares {
     capacity_gb = var.capacity_gb
